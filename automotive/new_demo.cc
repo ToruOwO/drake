@@ -87,12 +87,6 @@ DEFINE_bool(with_stalled_cars, false, "Places a stalled vehicle at the end of "
             "each lane of a dragway. This option is only enabled when the "
             "road is a dragway.");
 
-DEFINE_bool(static_simple_car, false, "Use AddStaticSimpleCars instead.");
-
-DEFINE_bool(static_traj_car, false, "Create static trajectory cars on dragway "
-            "instead.");
-
-
 namespace drake {
 
 using maliput::api::Lane;
@@ -203,42 +197,6 @@ void AddSimpleCars(AutomotiveSimulator<double>* simulator) {
   }
 }
 
-void AddStaticSimpleCars(AutomotiveSimulator<double>* simulator) {
-  const double kSimpleCarYSpacing{3};
-  const double kSimpleCarXSpacing{15};
-  if (FLAGS_num_simple_car != 0 && !FLAGS_simple_car_names.empty()) {
-    throw std::runtime_error("Both --num_simple_car and --simple_car_names "
-        "specified. Only one can be specified at a time.");
-  }
-  if (FLAGS_num_simple_car != 0 || !FLAGS_simple_car_names.empty()) {
-    std::string simple_car_names = FLAGS_simple_car_names;
-    if (FLAGS_simple_car_names.empty()) {
-      for (int i = 0; i < FLAGS_num_simple_car; ++i) {
-        if (i != 0) {
-          simple_car_names += ",";
-        }
-        simple_car_names += std::to_string(i);
-      }
-    }
-    std::istringstream simple_car_name_stream(simple_car_names);
-    std::string name;
-    double y_offset{0};
-    double x_offset{FLAGS_dragway_length/2}; // set x offset = middle of lane
-    // PoseVelocity velocity = PoseVelocity();
-    while (getline(simple_car_name_stream, name, ',')) {
-      const std::string& channel_name = MakeChannelName(name);
-      drake::log()->info("Adding simple car subscribed to {}.", channel_name);
-      SimpleCarState<double> state;
-      state.set_y(y_offset);
-      state.set_x(x_offset);
-      // state.set_velocity(velocity);
-      simulator->AddPriusSimpleCar(name, channel_name, state);
-       y_offset += kSimpleCarYSpacing;
-       x_offset += kSimpleCarXSpacing;
-     }
-  }
-}
-
 // Initializes the provided `simulator` with user-specified numbers of
 // `SimpleCar` vehicles and `TrajectoryCar` vehicles. If parameter
 // `road_network_type` equals `RoadNetworkType::dragway`, the provided
@@ -246,36 +204,25 @@ void AddStaticSimpleCars(AutomotiveSimulator<double>* simulator) {
 void AddVehicles(RoadNetworkType road_network_type,
     const maliput::api::RoadGeometry* road_geometry,
     AutomotiveSimulator<double>* simulator) {
-  if (FLAGS_static_simple_car) {
-    AddStaticSimpleCars(simulator);
-  } else {
-    AddSimpleCars(simulator);
-  }
+  AddSimpleCars(simulator);
 
   if (road_network_type == RoadNetworkType::dragway) {
-    const double kObstacleTrajCarXSpacing{30};
     DRAKE_DEMAND(road_geometry != nullptr);
     const maliput::dragway::RoadGeometry* dragway_road_geometry =
         dynamic_cast<const maliput::dragway::RoadGeometry*>(road_geometry);
     DRAKE_DEMAND(dragway_road_geometry != nullptr);
     for (int i = 0; i < FLAGS_num_trajectory_car; ++i) {
       const int lane_index = i % FLAGS_num_dragway_lanes;
-      double start_position;
-      double speed;
-      if (FLAGS_static_traj_car) {
-        speed = 0;
-        start_position = FLAGS_dragway_length/3 + i * kObstacleTrajCarXSpacing;
-      } else {
-       speed = FLAGS_dragway_base_speed + lane_index * FLAGS_dragway_lane_speed_delta;
-       start_position = i / FLAGS_num_dragway_lanes *
+      const double speed = FLAGS_dragway_base_speed +
+          lane_index * FLAGS_dragway_lane_speed_delta;
+      const double start_position = i / FLAGS_num_dragway_lanes *
            FLAGS_dragway_vehicle_spacing;
-      }
       const auto& params = CreateTrajectoryParamsForDragway(
-            *dragway_road_geometry, lane_index, speed, start_position);
-        simulator->AddPriusTrajectoryCar("TrajectoryCar" + std::to_string(i),
-                                         std::get<0>(params),
-                                         std::get<1>(params),
-                                         std::get<2>(params));
+          *dragway_road_geometry, lane_index, speed, start_position);
+      simulator->AddPriusTrajectoryCar("TrajectoryCar" + std::to_string(i),
+                                       std::get<0>(params),
+                                       std::get<1>(params),
+                                       std::get<2>(params));
     }
 
     for (int i = 0; i < FLAGS_num_mobil_car; ++i) {

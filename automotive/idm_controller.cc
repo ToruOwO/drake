@@ -24,6 +24,9 @@ using systems::rendering::PoseVector;
 
 static constexpr int kIdmParamsIndex{0};
 
+const bool kUseCustomScanAheadDistance{true};
+const double kScanAheadDistance{5};
+
 template <typename T>
 IdmController<T>::IdmController(const RoadGeometry& road,
                                 ScanStrategy path_or_branches,
@@ -132,10 +135,19 @@ void IdmController<T>::ImplCalcAcceleration(
         road_.ToRoadPosition(gp.MakeDouble(), nullptr, nullptr, nullptr);
   }
 
+  double scan_ahead_distance;
+
+  if (kUseCustomScanAheadDistance) {
+    scan_ahead_distance = kScanAheadDistance;
+  } else {
+    // scan_ahead_distance = idm_params.scan_ahead_distance();
+    scan_ahead_distance = 100;
+  }
+
   // Find the single closest car ahead.
   const ClosestPose<T> lead_car_pose = PoseSelector<T>::FindSingleClosestPose(
       ego_position.lane, ego_pose, traffic_poses,
-      idm_params.scan_ahead_distance(), AheadOrBehind::kAhead,
+      scan_ahead_distance, AheadOrBehind::kAhead,
       path_or_branches_);
   const T headway_distance = lead_car_pose.distance;
 

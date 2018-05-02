@@ -42,5 +42,15 @@ std::tuple<Curve2<double>, double, double> CreateTrajectoryParamsForDragway(
     const maliput::dragway::RoadGeometry& road_geometry, int index,
     double speed, double start_time);
 
+
+/**
+* @param end_s The ending x-position of car
+*
+* @param end_r The ending y-position of car
+*/
+std::tuple<Curve2<double>, double, double> CreateTrajectoryParamsForDragwayWithCustomEndPosition(
+    const maliput::dragway::RoadGeometry& road_geometry, int index,
+    double speed, double start_time, double end_s, double end_r) 
+
 }  // namespace automotive
 }  // namespace drake

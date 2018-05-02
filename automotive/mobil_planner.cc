@@ -27,6 +27,9 @@ using systems::rendering::PoseVector;
 
 namespace automotive {
 
+const bool kUseCustomScanAheadDistance{true};
+const double kScanAheadDistance{5};
+
 template <typename T>
 MobilPlanner<T>::MobilPlanner(const RoadGeometry& road, bool initial_with_s,
                               RoadPositionStrategy road_position_strategy,
@@ -91,9 +94,11 @@ template <typename T>
 void MobilPlanner<T>::CalcLaneDirection(const systems::Context<T>& context,
                                         LaneDirection* lane_direction) const {
   // Obtain the parameters.
+
   const IdmPlannerParameters<T>& idm_params =
       this->template GetNumericParameter<IdmPlannerParameters>(context,
                                                                kIdmParamsIndex);
+
   const MobilPlannerParameters<T>& mobil_params =
       this->template GetNumericParameter<MobilPlannerParameters>(
           context, kMobilParamsIndex);
@@ -180,10 +185,20 @@ const std::pair<T, T> MobilPlanner<T>::ComputeIncentives(
   // second elements correspond to the left and right lanes, respectively.
   std::pair<T, T> incentives(-kDefaultLargeAccel, -kDefaultLargeAccel);
 
+  double scan_ahead_distance;
+
+  if (kUseCustomScanAheadDistance) {
+    scan_ahead_distance = kScanAheadDistance;
+  } else {
+    // scan_ahead_distance = idm_params.scan_ahead_distance();
+    scan_ahead_distance = 100;
+
+  }
+
   DRAKE_DEMAND(ego_closest_pose.odometry.lane != nullptr);
   const ClosestPoses current_closest_poses = PoseSelector<T>::FindClosestPair(
       ego_closest_pose.odometry.lane, ego_pose, traffic_poses,
-      idm_params.scan_ahead_distance(), ScanStrategy::kPath);
+      scan_ahead_distance, ScanStrategy::kPath);
   // Construct ClosestPose containers for the leading, trailing, and ego car.
   const ClosestPose<T>& leading_closest_pose =
       current_closest_poses.at(AheadOrBehind::kAhead);
@@ -202,7 +217,7 @@ const std::pair<T, T> MobilPlanner<T>::ComputeIncentives(
   // Compute the incentive for the left lane.
   if (lanes.first != nullptr) {
     const ClosestPoses left_closest_poses = PoseSelector<T>::FindClosestPair(
-        lanes.first, ego_pose, traffic_poses, idm_params.scan_ahead_distance(),
+        lanes.first, ego_pose, traffic_poses, scan_ahead_distance,
         ScanStrategy::kPath);
     ComputeIncentiveOutOfLane(idm_params, mobil_params, left_closest_poses,
                               ego_closest_pose, ego_acceleration,
@@ -212,7 +227,7 @@ const std::pair<T, T> MobilPlanner<T>::ComputeIncentives(
   if (lanes.second != nullptr) {
     const ClosestPoses right_closest_poses =
         PoseSelector<T>::FindClosestPair(lanes.second, ego_pose, traffic_poses,
-                                         idm_params.scan_ahead_distance(),
+                                         scan_ahead_distance,
                                          ScanStrategy::kPath);
     ComputeIncentiveOutOfLane(idm_params, mobil_params, right_closest_poses,
                               ego_closest_pose, ego_acceleration,
